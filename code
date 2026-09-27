@@ -1,0 +1,384 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+
+from sklearn.datasets import load_linnerud
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, PolynomialFeatures
+from sklearn.linear_model import LinearRegression, Ridge
+from sklearn.pipeline import Pipeline
+
+from sklearn.metrics import (
+    mean_absolute_error,
+    mean_squared_error,
+    r2_score
+)
+
+# ------------------------------------------------------------
+# 1. Load Linnerud Dataset
+# ------------------------------------------------------------
+
+data = load_linnerud()
+
+X = data.data
+
+# Select Weight as the single continuous target
+y = data.target[:, 0]
+
+print("Number of samples:", X.shape[0])
+print("Number of features:", X.shape[1])
+
+print("Input features:", data.feature_names)
+print("Target selected: Weight")
+
+# ------------------------------------------------------------
+# 2. Train-Test Split
+# ------------------------------------------------------------
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X,
+    y,
+    test_size=0.20,
+    random_state=42
+)
+
+print("Training samples:", X_train.shape[0])
+print("Testing samples:", X_test.shape[0])
+
+# ------------------------------------------------------------
+# 3. Define Regression Models
+# ------------------------------------------------------------
+
+models = {
+
+    "Linear Regression":
+        LinearRegression(),
+
+    "Ridge Regression":
+        Pipeline([
+            ("scaler", StandardScaler()),
+            ("model", Ridge(alpha=1.0))
+        ]),
+
+    "Polynomial Regression (Degree 2)":
+        Pipeline([
+            ("poly",
+             PolynomialFeatures(
+                 degree=2,
+                 include_bias=False
+             )),
+
+            ("scaler", StandardScaler()),
+
+            ("model", LinearRegression())
+        ])
+}
+
+# ------------------------------------------------------------
+# 4. Train and Evaluate Regression Models
+# ------------------------------------------------------------
+
+results = []
+
+for name, model in models.items():
+
+    model.fit(X_train, y_train)
+
+    y_pred = model.predict(X_test)
+
+    mae = mean_absolute_error(
+        y_test,
+        y_pred
+    )
+
+    mse = mean_squared_error(
+        y_test,
+        y_pred
+    )
+
+    rmse = np.sqrt(mse)
+
+    r2 = r2_score(
+        y_test,
+        y_pred
+    )
+
+    results.append([
+        name,
+        mae,
+        mse,
+        rmse,
+        r2
+    ])
+
+results_df = pd.DataFrame(
+    results,
+    columns=[
+        "Model",
+        "MAE",
+        "MSE",
+        "RMSE",
+        "R2 Score"
+    ]
+)
+
+print("\nRegression Results:")
+print(results_df)
+
+# ------------------------------------------------------------
+# 5. Gradient Descent Linear Regression
+# ------------------------------------------------------------
+
+class GradientDescentLinearRegression:
+
+    def __init__(
+        self,
+        learning_rate=0.03,
+        epochs=5000
+    ):
+
+        self.learning_rate = learning_rate
+        self.epochs = epochs
+
+        self.weights = None
+        self.bias = None
+
+        self.loss_history = []
+
+    def fit(self, X, y):
+
+        n_samples, n_features = X.shape
+
+        # Initialize weights and bias
+        self.weights = np.zeros(n_features)
+        self.bias = 0.0
+
+        for epoch in range(self.epochs):
+
+            # Prediction
+            predictions = (
+                X @ self.weights
+                + self.bias
+            )
+
+            # Error
+            error = predictions - y
+
+            # Gradients
+            dw = (
+                (2 / n_samples)
+                * (X.T @ error)
+            )
+
+            db = (
+                (2 / n_samples)
+                * np.sum(error)
+            )
+
+            # Update parameters
+            self.weights -= (
+                self.learning_rate * dw
+            )
+
+            self.bias -= (
+                self.learning_rate * db
+            )
+
+            # Calculate MSE
+            loss = np.mean(
+                error ** 2
+            )
+
+            self.loss_history.append(
+                loss
+            )
+
+        return self
+
+    def predict(self, X):
+
+        return (
+            X @ self.weights
+            + self.bias
+        )
+
+
+# ------------------------------------------------------------
+# 6. Standardize Data
+# ------------------------------------------------------------
+
+scaler_gd = StandardScaler()
+
+X_train_scaled = (
+    scaler_gd.fit_transform(X_train)
+)
+
+X_test_scaled = (
+    scaler_gd.transform(X_test)
+)
+
+# ------------------------------------------------------------
+# 7. Train Gradient Descent Model
+# ------------------------------------------------------------
+
+gd_model = GradientDescentLinearRegression(
+    learning_rate=0.03,
+    epochs=5000
+)
+
+gd_model.fit(
+    X_train_scaled,
+    y_train
+)
+
+gd_predictions = gd_model.predict(
+    X_test_scaled
+)
+
+print("\nGradient Descent training completed.")
+
+print("Learning rate:",
+      gd_model.learning_rate)
+
+print("Epochs:",
+      gd_model.epochs)
+
+# ------------------------------------------------------------
+# 8. Evaluate Gradient Descent
+# ------------------------------------------------------------
+
+gd_mae = mean_absolute_error(
+    y_test,
+    gd_predictions
+)
+
+gd_mse = mean_squared_error(
+    y_test,
+    gd_predictions
+)
+
+gd_rmse = np.sqrt(gd_mse)
+
+gd_r2 = r2_score(
+    y_test,
+    gd_predictions
+)
+
+print("\nGradient Descent Results")
+print("------------------------")
+print("MAE :", gd_mae)
+print("MSE :", gd_mse)
+print("RMSE:", gd_rmse)
+print("R2  :", gd_r2)
+
+# ------------------------------------------------------------
+# 9. Gradient Descent Convergence
+# ------------------------------------------------------------
+
+plt.figure(figsize=(8, 5))
+
+plt.plot(
+    gd_model.loss_history,
+    label="Training MSE"
+)
+
+plt.xlabel("Epoch")
+plt.ylabel("Mean Squared Error")
+
+plt.title(
+    "Gradient Descent Convergence"
+)
+
+plt.grid(True)
+plt.legend()
+
+plt.show()
+
+print(
+    "Initial MSE:",
+    gd_model.loss_history[0]
+)
+
+print(
+    "Final MSE:",
+    gd_model.loss_history[-1]
+)
+
+# ------------------------------------------------------------
+# 10. Actual vs Predicted
+# ------------------------------------------------------------
+
+linear_model = models[
+    "Linear Regression"
+]
+
+linear_predictions = (
+    linear_model.predict(X_test)
+)
+
+plt.figure(figsize=(8, 5))
+
+plt.scatter(
+    y_test,
+    linear_predictions
+)
+
+minimum = min(
+    y_test.min(),
+    linear_predictions.min()
+)
+
+maximum = max(
+    y_test.max(),
+    linear_predictions.max()
+)
+
+plt.plot(
+    [minimum, maximum],
+    [minimum, maximum],
+    linestyle="--"
+)
+
+plt.xlabel("Actual Weight")
+plt.ylabel("Predicted Weight")
+
+plt.title(
+    "Actual vs Predicted - Linear Regression"
+)
+
+plt.grid(True)
+
+plt.show()
+
+# ------------------------------------------------------------
+# 11. Final Performance Comparison
+# ------------------------------------------------------------
+
+gd_results = pd.DataFrame([{
+
+    "Model":
+        "Gradient Descent Linear Regression",
+
+    "MAE": gd_mae,
+
+    "MSE": gd_mse,
+
+    "RMSE": gd_rmse,
+
+    "R2 Score": gd_r2
+
+}])
+
+final_results = pd.concat(
+    [
+        results_df,
+        gd_results
+    ],
+    ignore_index=True
+)
+
+print(
+    "\nFinal Performance Comparison:"
+)
+
+print(final_results)
